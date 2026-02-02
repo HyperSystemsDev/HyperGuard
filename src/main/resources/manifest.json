@@ -1,0 +1,9 @@
+{
+  "Group": "dev.hypersystems.hyperguard",
+  "Name": "HyperGuard",
+  "Version": "${version}",
+  "Description": "A server-side anti-cheat plugin for Hytale servers with movement, combat, and world checks.",
+  "Website": "https://github.com/HyperSystemsDev/HyperGuard",
+  "Main": "dev.hypersystems.hyperguard.HyperGuard",
+  "ServerVersion": "*"
+}
