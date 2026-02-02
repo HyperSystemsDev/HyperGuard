@@ -25,7 +25,7 @@ public final class CheckConfig {
      */
     public CheckConfig() {
         this.enabled = true;
-        this.tolerance = 0.1;
+        this.tolerance = 0.30;
         this.vlMultiplier = 1.0;
         this.vlDecayRate = 0.5;
         this.maxVL = 100.0;

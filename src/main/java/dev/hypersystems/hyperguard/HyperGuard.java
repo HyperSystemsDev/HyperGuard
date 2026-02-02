@@ -13,11 +13,13 @@ import dev.hypersystems.hyperguard.config.HyperGuardConfig;
 import dev.hypersystems.hyperguard.listener.PlayerConnectionListener;
 import dev.hypersystems.hyperguard.player.HGPlayerData;
 import dev.hypersystems.hyperguard.player.HGPlayerManager;
+import dev.hypersystems.hyperguard.player.PositionHistory;
 import dev.hypersystems.hyperguard.util.Logger;
 import dev.hypersystems.hyperguard.violation.ViolationManager;
 import org.jetbrains.annotations.NotNull;
 
 import java.nio.file.Path;
+import java.util.Collection;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -233,7 +235,7 @@ public class HyperGuard extends JavaPlugin {
             TimeUnit.MILLISECONDS
         );
 
-        Logger.debug("Scheduled VL decay task (every %d ticks / %dms)", decayIntervalTicks, decayIntervalMs);
+        Logger.info("Scheduled VL decay task (every %d ticks / %dms)", decayIntervalTicks, decayIntervalMs);
 
         // Movement check task - runs every tick (50ms)
         movementCheckTask = scheduler.scheduleAtFixedRate(
@@ -243,7 +245,7 @@ public class HyperGuard extends JavaPlugin {
             TimeUnit.MILLISECONDS
         );
 
-        Logger.debug("Scheduled movement check task (every tick / 50ms)");
+        Logger.info("Scheduled movement check task (every tick / 50ms)");
     }
 
     /**
@@ -262,14 +264,53 @@ public class HyperGuard extends JavaPlugin {
      */
     private void runMovementChecks() {
         try {
-            for (HGPlayerData playerData : HGPlayerManager.get().getAllPlayerData()) {
+            Collection<HGPlayerData> allPlayers = HGPlayerManager.get().getAllPlayerData();
+            for (HGPlayerData playerData : allPlayers) {
                 PlayerRef playerRef = playerData.getPlayerRef();
-                if (playerRef != null && playerRef.isValid()) {
-                    CheckManager.get().processChecksByType(CheckType.MOVEMENT, playerRef, playerData);
+                if (playerRef == null) {
+                    continue;
                 }
+                if (!playerRef.isValid()) {
+                    continue;
+                }
+
+                // Record position from PlayerRef's cached transform
+                try {
+                    com.hypixel.hytale.math.vector.Transform transform = playerRef.getTransform();
+                    if (transform != null) {
+                        // Access position via getPosition() method which returns Vector3d
+                        com.hypixel.hytale.math.vector.Vector3d pos = transform.getPosition();
+                        com.hypixel.hytale.math.vector.Vector3f rot = transform.getRotation();
+
+                        if (pos != null) {
+                            double x = pos.getX();
+                            double y = pos.getY();
+                            double z = pos.getZ();
+                            float yaw = rot != null ? rot.getYaw() : 0;
+                            float pitch = rot != null ? rot.getPitch() : 0;
+
+                            // Get onGround from position history heuristic
+                            PositionHistory history = playerData.getPositionHistory();
+                            PositionHistory.PositionSample lastSample = history.getLatest();
+
+                            boolean onGround = false;
+                            if (lastSample != null) {
+                                double yDelta = y - lastSample.y();
+                                onGround = Math.abs(yDelta) < 0.01 || (yDelta > -0.1 && yDelta <= 0);
+                            }
+
+                            playerData.recordPosition(x, y, z, yaw, pitch, onGround);
+                        }
+                    }
+                } catch (Exception e) {
+                    // Ignore position recording errors
+                }
+
+                // Run movement checks
+                CheckManager.get().processChecksByType(CheckType.MOVEMENT, playerRef, playerData);
             }
         } catch (Exception e) {
-            Logger.debug("Movement check task error: %s", e.getMessage());
+            Logger.warn("Movement check task error: %s", e.getMessage());
         }
     }
 

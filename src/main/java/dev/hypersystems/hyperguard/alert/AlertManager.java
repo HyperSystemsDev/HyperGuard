@@ -22,6 +22,7 @@ public final class AlertManager {
     private static final Color GOLD = new Color(255, 170, 0);
     private static final Color GRAY = Color.GRAY;
     private static final Color WHITE = Color.WHITE;
+    private static final Color CYAN = new Color(85, 255, 255);
 
     private static AlertManager instance;
 
@@ -139,6 +140,58 @@ public final class AlertManager {
             player.sendMessage(message);
         } catch (Exception e) {
             Logger.debug("Failed to send alert: %s", e.getMessage());
+        }
+    }
+
+    /**
+     * Sends a debug message to a player if they have debug mode enabled.
+     *
+     * @param playerData the player data
+     * @param checkName the check name
+     * @param text the debug text
+     */
+    public void sendDebug(@NotNull HGPlayerData playerData, @NotNull String checkName, @NotNull String text) {
+        if (!playerData.isDebugMode()) {
+            return;
+        }
+
+        PlayerRef player = ActionExecutor.get().getPlayer(playerData.getUuid());
+        if (player == null) {
+            return;
+        }
+
+        Message message = Message.raw("[HG Debug] ").color(CYAN)
+            .insert(Message.raw(checkName + ": ").color(GOLD))
+            .insert(Message.raw(text).color(GRAY));
+
+        try {
+            player.sendMessage(message);
+        } catch (Exception e) {
+            // Ignore
+        }
+    }
+
+    /**
+     * Sends a debug message directly to a PlayerRef if debug mode is enabled.
+     *
+     * @param player the player
+     * @param playerData the player data
+     * @param checkName the check name
+     * @param text the debug text
+     */
+    public void sendDebug(@NotNull PlayerRef player, @NotNull HGPlayerData playerData, @NotNull String checkName, @NotNull String text) {
+        if (!playerData.isDebugMode()) {
+            return;
+        }
+
+        Message message = Message.raw("[HG Debug] ").color(CYAN)
+            .insert(Message.raw(checkName + ": ").color(GOLD))
+            .insert(Message.raw(text).color(GRAY));
+
+        try {
+            player.sendMessage(message);
+        } catch (Exception e) {
+            // Ignore
         }
     }
 

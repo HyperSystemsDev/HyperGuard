@@ -84,11 +84,11 @@ public abstract class Check {
     /**
      * Gets the tolerance value from config.
      *
-     * @return the tolerance, or 0.1 as default
+     * @return the tolerance, or 0.30 as default
      */
     protected final double getTolerance() {
         CheckConfig config = getConfig();
-        return config != null ? config.getTolerance() : 0.1;
+        return config != null ? config.getTolerance() : 0.30;
     }
 
     /**

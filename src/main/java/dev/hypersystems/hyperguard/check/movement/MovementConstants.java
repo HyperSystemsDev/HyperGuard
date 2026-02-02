@@ -11,41 +11,50 @@ public final class MovementConstants {
     }
 
     // ==================== Movement Speeds (blocks/tick) ====================
+    // Hytale empirical values - measured from actual gameplay debug output
 
     /**
      * Base walking speed in blocks per tick.
+     * Observed: ~0.28-0.37 blocks/tick (peaks at ~0.37)
      */
-    public static final double WALK_SPEED = 0.216;
+    public static final double WALK_SPEED = 0.37;
 
     /**
      * Sprinting speed in blocks per tick.
+     * Observed: ~0.60 normal sprint, ~0.75-0.91 sprint-jumping
+     * Set to 0.90 to cover all normal sprint-jumping scenarios.
      */
-    public static final double SPRINT_SPEED = 0.281;
+    public static final double SPRINT_SPEED = 0.90;
 
     /**
      * Sneaking/crouching speed in blocks per tick.
+     * Proportionally scaled from Minecraft ratio.
      */
-    public static final double SNEAK_SPEED = 0.065;
+    public static final double SNEAK_SPEED = 0.12;
 
     /**
      * Swimming speed in blocks per tick.
+     * Proportionally scaled from Minecraft ratio.
      */
-    public static final double SWIM_SPEED = 0.115;
+    public static final double SWIM_SPEED = 0.20;
 
     /**
      * Climbing speed (ladders, vines) in blocks per tick.
+     * Proportionally scaled from Minecraft ratio.
      */
-    public static final double CLIMB_SPEED = 0.118;
+    public static final double CLIMB_SPEED = 0.20;
 
     /**
      * Flying speed (creative mode) in blocks per tick.
+     * Proportionally scaled from Minecraft ratio.
      */
-    public static final double FLY_SPEED = 0.5;
+    public static final double FLY_SPEED = 0.75;
 
     /**
      * Gliding speed (elytra-like) in blocks per tick.
+     * Proportionally scaled from Minecraft ratio.
      */
-    public static final double GLIDE_SPEED = 1.0;
+    public static final double GLIDE_SPEED = 1.5;
 
     // ==================== Physics Constants ====================
 

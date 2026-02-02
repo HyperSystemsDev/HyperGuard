@@ -1,23 +1,18 @@
 package dev.hypersystems.hyperguard.check.movement;
 
-import com.hypixel.hytale.component.Ref;
-import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.math.vector.Vector3d;
-import com.hypixel.hytale.protocol.MovementStates;
-import com.hypixel.hytale.server.core.entity.movement.MovementStatesComponent;
-import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
-import com.hypixel.hytale.server.core.modules.physics.component.Velocity;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
-import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import dev.hypersystems.hyperguard.alert.AlertManager;
 import dev.hypersystems.hyperguard.check.Check;
 import dev.hypersystems.hyperguard.check.CheckType;
 import dev.hypersystems.hyperguard.player.HGPlayerData;
+import dev.hypersystems.hyperguard.player.PositionHistory;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
  * Abstract base class for movement-related anti-cheat checks.
- * Provides common functionality for accessing movement ECS components.
+ * Uses PositionHistory and HGPlayerData flags instead of ECS components
+ * to avoid thread-safety issues with component access.
  */
 public abstract class MovementCheck extends Check {
 
@@ -31,68 +26,14 @@ public abstract class MovementCheck extends Check {
     }
 
     /**
-     * Gets movement data for a player.
-     *
-     * @param playerRef the player reference
-     * @return the movement data, or null if unavailable
-     */
-    @Nullable
-    protected MovementData getMovementData(@NotNull PlayerRef playerRef) {
-        if (!playerRef.isValid()) {
-            return null;
-        }
-
-        Ref<EntityStore> entityRef = playerRef.getReference();
-        if (entityRef == null || !entityRef.isValid()) {
-            return null;
-        }
-
-        try {
-            Store<EntityStore> store = entityRef.getStore();
-            if (store == null) {
-                return null;
-            }
-
-            TransformComponent transform = store.getComponent(entityRef, TransformComponent.getComponentType());
-            Velocity velocity = store.getComponent(entityRef, Velocity.getComponentType());
-            MovementStatesComponent movementStates = store.getComponent(entityRef, MovementStatesComponent.getComponentType());
-
-            if (transform == null || velocity == null || movementStates == null) {
-                return null;
-            }
-
-            return new MovementData(transform, velocity, movementStates);
-        } catch (Exception e) {
-            // Component access failed
-            return null;
-        }
-    }
-
-    /**
      * Checks if a player has movement exemptions that should skip checks.
      *
      * @param playerData the player data
-     * @param states the movement states
      * @return true if the player should be exempt
      */
-    protected boolean hasMovementExemption(@NotNull HGPlayerData playerData, @NotNull MovementStates states) {
+    protected boolean hasMovementExemption(@NotNull HGPlayerData playerData) {
         // Flying (creative mode) - exempt from most checks
-        if (states.flying) {
-            return true;
-        }
-
-        // Mounting (riding entity) - exempt from most checks
-        if (states.mounting) {
-            return true;
-        }
-
-        // Sitting - exempt
-        if (states.sitting) {
-            return true;
-        }
-
-        // Sleeping - exempt
-        if (states.sleeping) {
+        if (playerData.isFlying()) {
             return true;
         }
 
@@ -115,41 +56,57 @@ public abstract class MovementCheck extends Check {
     }
 
     /**
-     * Gets the expected maximum horizontal speed based on movement states.
+     * Gets the expected maximum horizontal speed.
      *
-     * @param states the movement states
-     * @param tolerance additional tolerance multiplier (e.g., 0.15 for 15% tolerance)
+     * Uses SPRINT_SPEED as the baseline since we cannot reliably detect movement state
+     * (ECS components are not accessible from the background scheduler thread).
+     * This prevents false positives when players are sprinting but the state shows "walking".
+     *
+     * @param playerData the player data
+     * @param tolerance additional tolerance multiplier (e.g., 0.30 for 30% tolerance)
      * @return the maximum expected speed in blocks per tick
      */
-    protected double getExpectedMaxSpeed(@NotNull MovementStates states, double tolerance) {
+    protected double getExpectedMaxSpeed(@NotNull HGPlayerData playerData, double tolerance) {
         double baseSpeed;
 
-        if (states.flying) {
+        // Flying and gliding have separate physics and are typically exempted,
+        // but if they reach here, use their appropriate speeds
+        if (playerData.isFlying()) {
             baseSpeed = MovementConstants.FLY_SPEED;
-        } else if (states.gliding) {
+        } else if (playerData.isGliding()) {
             baseSpeed = MovementConstants.GLIDE_SPEED;
-        } else if (states.sprinting) {
-            baseSpeed = MovementConstants.SPRINT_SPEED;
-        } else if (states.swimming) {
-            baseSpeed = MovementConstants.SWIM_SPEED;
-        } else if (states.climbing) {
-            baseSpeed = MovementConstants.CLIMB_SPEED;
-        } else if (states.crouching || states.forcedCrouching) {
-            baseSpeed = MovementConstants.SNEAK_SPEED;
-        } else if (states.walking || states.running) {
-            baseSpeed = MovementConstants.WALK_SPEED;
         } else {
-            // Idle or other states
-            baseSpeed = MovementConstants.WALK_SPEED;
-        }
-
-        // Apply water modifier
-        if (states.inFluid) {
-            baseSpeed *= MovementConstants.WATER_SPEED_MULTIPLIER;
+            // Always use sprint speed as baseline since we can't reliably detect
+            // walking vs sprinting state from the async check thread.
+            // This prevents false positives from state detection failures.
+            baseSpeed = MovementConstants.SPRINT_SPEED;
         }
 
         // Apply tolerance
         return baseSpeed * (1.0 + tolerance);
+    }
+
+    /**
+     * Gets the current and previous position samples from history.
+     *
+     * @param playerData the player data
+     * @return array of [current, previous] samples, or null if insufficient history
+     */
+    @Nullable
+    protected PositionHistory.PositionSample[] getPositionSamples(@NotNull HGPlayerData playerData) {
+        PositionHistory history = playerData.getPositionHistory();
+        if (history.size() < 2) {
+            return null;
+        }
+
+        PositionHistory.PositionSample current = history.getLatest();
+        PositionHistory.PositionSample previous = history.getPrevious();
+
+        if (current == null || previous == null) {
+            return null;
+        }
+
+        return new PositionHistory.PositionSample[] { current, previous };
     }
 
     /**
@@ -164,86 +121,46 @@ public abstract class MovementCheck extends Check {
     }
 
     /**
-     * Record class for holding movement-related ECS components.
+     * Gets a description of the current movement state.
+     *
+     * @param playerData the player data
+     * @return a brief state description
      */
-    public record MovementData(
-        @NotNull TransformComponent transform,
-        @NotNull Velocity velocity,
-        @NotNull MovementStatesComponent movementStates
-    ) {
-        /**
-         * Gets the current position.
-         *
-         * @return the position vector
-         */
-        @NotNull
-        public Vector3d getPosition() {
-            return transform.getPosition();
-        }
+    protected String getStateDescription(@NotNull HGPlayerData playerData) {
+        if (playerData.isFlying()) return "flying";
+        if (playerData.isGliding()) return "gliding";
+        if (playerData.isSprinting()) return "sprinting";
+        if (playerData.isSwimming()) return "swimming";
+        if (playerData.isClimbing()) return "climbing";
+        if (playerData.isSneaking()) return "sneaking";
+        return "walking";
+    }
 
-        /**
-         * Gets the current velocity.
-         *
-         * @return the velocity vector
-         */
-        @NotNull
-        public Vector3d getVelocity() {
-            return velocity.getVelocity();
+    /**
+     * Sends a debug message to a player if they have debug mode enabled.
+     *
+     * @param player the player
+     * @param playerData the player data
+     * @param message the message
+     */
+    protected void sendDebug(@NotNull PlayerRef player, @NotNull HGPlayerData playerData, @NotNull String message) {
+        if (playerData.isDebugMode()) {
+            AlertManager.get().sendDebug(player, playerData, getName(), message);
         }
+    }
 
-        /**
-         * Gets the current movement states.
-         *
-         * @return the movement states
-         */
-        @NotNull
-        public MovementStates getStates() {
-            return movementStates.getMovementStates();
-        }
-
-        /**
-         * Checks if the player is on the ground.
-         *
-         * @return true if on ground
-         */
-        public boolean isOnGround() {
-            return movementStates.getMovementStates().onGround;
-        }
-
-        /**
-         * Checks if the player is in a fluid.
-         *
-         * @return true if in fluid
-         */
-        public boolean isInFluid() {
-            return movementStates.getMovementStates().inFluid;
-        }
-
-        /**
-         * Checks if the player is climbing.
-         *
-         * @return true if climbing
-         */
-        public boolean isClimbing() {
-            return movementStates.getMovementStates().climbing;
-        }
-
-        /**
-         * Checks if the player is flying.
-         *
-         * @return true if flying
-         */
-        public boolean isFlying() {
-            return movementStates.getMovementStates().flying;
-        }
-
-        /**
-         * Checks if the player is gliding.
-         *
-         * @return true if gliding
-         */
-        public boolean isGliding() {
-            return movementStates.getMovementStates().gliding;
+    /**
+     * Sends a formatted debug message to a player if they have debug mode enabled.
+     *
+     * @param player the player
+     * @param playerData the player data
+     * @param format the message format
+     * @param args the format arguments
+     */
+    protected void sendDebug(@NotNull PlayerRef player, @NotNull HGPlayerData playerData, @NotNull String format, Object... args) {
+        if (playerData.isDebugMode()) {
+            String message = String.format(format, args);
+            AlertManager.get().sendDebug(player, playerData, getName(), message);
         }
     }
 }

@@ -1,6 +1,5 @@
 package dev.hypersystems.hyperguard.check.movement;
 
-import com.hypixel.hytale.protocol.MovementStates;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import dev.hypersystems.hyperguard.player.HGPlayerData;
 import dev.hypersystems.hyperguard.player.PositionHistory;
@@ -20,55 +19,43 @@ public final class SpeedCheck extends MovementCheck {
     public void process(@NotNull PlayerRef player, @NotNull HGPlayerData playerData) {
         // Check if exempt
         if (isExempt(playerData)) {
+            sendDebug(player, playerData, "exempt (general)");
             return;
         }
 
         // Check permission bypass
         if (hasExemptPermission(player)) {
+            sendDebug(player, playerData, "exempt (permission)");
             return;
         }
-
-        // Get movement data from ECS
-        MovementData movementData = getMovementData(player);
-        if (movementData == null) {
-            return;
-        }
-
-        MovementStates states = movementData.getStates();
 
         // Check for movement exemptions
-        if (hasMovementExemption(playerData, states)) {
+        if (hasMovementExemption(playerData)) {
+            sendDebug(player, playerData, "exempt (movement)");
             return;
         }
 
         // Flying players are exempt from speed checks
-        if (states.flying) {
+        if (playerData.isFlying()) {
+            sendDebug(player, playerData, "exempt (flying)");
             return;
         }
 
         // Gliding players have different physics
-        if (states.gliding) {
+        if (playerData.isGliding()) {
+            sendDebug(player, playerData, "exempt (gliding)");
             return;
         }
 
-        // Mounting players are exempt (mount controls speed)
-        if (states.mounting) {
+        // Get position samples
+        PositionHistory.PositionSample[] samples = getPositionSamples(playerData);
+        if (samples == null) {
+            sendDebug(player, playerData, "insufficient position history");
             return;
         }
 
-        // Get position history
-        PositionHistory history = playerData.getPositionHistory();
-        if (history.size() < 2) {
-            return;
-        }
-
-        // Calculate position delta from history
-        PositionHistory.PositionSample current = history.getLatest();
-        PositionHistory.PositionSample previous = history.getPrevious();
-
-        if (current == null || previous == null) {
-            return;
-        }
+        PositionHistory.PositionSample current = samples[0];
+        PositionHistory.PositionSample previous = samples[1];
 
         double deltaX = current.x() - previous.x();
         double deltaZ = current.z() - previous.z();
@@ -78,32 +65,18 @@ public final class SpeedCheck extends MovementCheck {
 
         // Skip if no significant movement
         if (horizontalSpeed < 0.001) {
-            return;
+            return; // Don't spam debug for idle
         }
 
         // Get expected max speed with tolerance
         double tolerance = getTolerance();
-        double expectedMaxSpeed = getExpectedMaxSpeed(states, tolerance);
+        double expectedMaxSpeed = getExpectedMaxSpeed(playerData, tolerance);
 
-        // Account for rolling state (has burst speed)
-        if (states.rolling) {
-            expectedMaxSpeed *= 1.5;
-        }
+        // Infer movement state from observed speed
+        String state = inferStateFromSpeed(horizontalSpeed);
 
-        // Account for sliding state
-        if (states.sliding) {
-            expectedMaxSpeed *= 1.3;
-        }
-
-        // Account for mantling (climbing up ledges)
-        if (states.mantling) {
-            expectedMaxSpeed *= 1.2;
-        }
-
-        // Account for jumping boost
-        if (states.jumping) {
-            expectedMaxSpeed *= 1.1;
-        }
+        // Send debug output
+        sendDebug(player, playerData, "speed=%.3f max=%.3f state=%s", horizontalSpeed, expectedMaxSpeed, state);
 
         // Check if speed exceeds expected
         if (horizontalSpeed > expectedMaxSpeed) {
@@ -115,7 +88,7 @@ public final class SpeedCheck extends MovementCheck {
                 horizontalSpeed,
                 expectedMaxSpeed,
                 speedDiff,
-                getStateDescription(states)
+                state
             );
 
             flag(playerData, vlAmount, details);
@@ -136,19 +109,27 @@ public final class SpeedCheck extends MovementCheck {
     }
 
     /**
-     * Gets a description of the current movement state.
+     * Infers movement state from observed speed.
+     * Since we can't access ECS components from the async thread,
+     * we infer the state based on speed thresholds.
      *
-     * @param states the movement states
-     * @return a brief state description
+     * Observed Hytale speeds:
+     * - Walking: ~0.28-0.37 blocks/tick
+     * - Sprinting: ~0.56-0.60 blocks/tick
+     * - Sprint-jumping: ~0.70-0.75 blocks/tick
+     *
+     * @param speed the observed horizontal speed
+     * @return inferred state description
      */
-    private String getStateDescription(@NotNull MovementStates states) {
-        if (states.sprinting) return "sprinting";
-        if (states.swimming) return "swimming";
-        if (states.climbing) return "climbing";
-        if (states.crouching) return "crouching";
-        if (states.walking) return "walking";
-        if (states.running) return "running";
-        if (states.idle) return "idle";
-        return "unknown";
+    private String inferStateFromSpeed(double speed) {
+        if (speed < 0.05) {
+            return "idle";
+        } else if (speed <= 0.40) {
+            return "walking";
+        } else if (speed <= 0.65) {
+            return "sprinting";
+        } else {
+            return "sprint-jumping";
+        }
     }
 }

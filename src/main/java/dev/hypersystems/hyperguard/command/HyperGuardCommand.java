@@ -47,6 +47,7 @@ public class HyperGuardCommand extends AbstractCommand {
         addSubCommand(new ExemptSubCommand());
         addSubCommand(new DebugSubCommand());
         addSubCommand(new InfoSubCommand());
+        addSubCommand(new TestSubCommand());
 
         // Add aliases
         addAliases("hg", "anticheat", "ac");
@@ -87,6 +88,8 @@ public class HyperGuardCommand extends AbstractCommand {
         parts.add(Message.raw(" - Toggle debug for player\n").color(GRAY));
         parts.add(Message.raw("    info").color(GREEN));
         parts.add(Message.raw(" - Plugin information\n").color(GRAY));
+        parts.add(Message.raw("    test <check>").color(GREEN));
+        parts.add(Message.raw(" - Simulate a check violation\n").color(GRAY));
         parts.add(Message.raw("\n  Use /hg <command> for details\n").color(GRAY));
         parts.add(Message.raw("-".repeat(width) + "\n").color(GRAY));
 
@@ -451,6 +454,62 @@ public class HyperGuardCommand extends AbstractCommand {
             parts.add(Message.raw(ViolationManager.get().getTotalViolationCount() + "\n").color(WHITE));
 
             ctx.sender().sendMessage(Message.join(parts.toArray(new Message[0])));
+            return CompletableFuture.completedFuture(null);
+        }
+    }
+
+    // ========== Test Subcommand ==========
+
+    private class TestSubCommand extends AbstractCommand {
+        private final RequiredArg<String> checkArg;
+        private final OptionalArg<Double> vlArg;
+
+        public TestSubCommand() {
+            super("test", "Simulate a check violation for testing");
+            this.checkArg = withRequiredArg("check", "Check name (speed, fly, nofall, phase)", ArgTypes.STRING);
+            this.vlArg = withOptionalArg("vl", "VL amount to simulate (default: 5.0)", ArgTypes.DOUBLE);
+        }
+
+        @Override
+        protected CompletableFuture<Void> execute(CommandContext ctx) {
+            Player player = getPlayer(ctx);
+            if (player == null) {
+                sendError(ctx, "This command can only be used by players");
+                return CompletableFuture.completedFuture(null);
+            }
+
+            String checkName = ctx.get(checkArg).toLowerCase();
+            Double vlAmount = ctx.get(vlArg);
+            if (vlAmount == null || vlAmount <= 0) {
+                vlAmount = 5.0;
+            }
+
+            // Validate check name
+            Check check = CheckManager.get().getCheck(checkName);
+            if (check == null) {
+                sendError(ctx, "Unknown check: " + checkName);
+                sendInfo(ctx, "Available: speed, fly, nofall, phase");
+                return CompletableFuture.completedFuture(null);
+            }
+
+            // Get player data
+            HGPlayerData data = HGPlayerManager.get().getPlayerData(player.getUuid());
+            if (data == null) {
+                sendError(ctx, "Player data not found");
+                return CompletableFuture.completedFuture(null);
+            }
+
+            // Simulate the violation
+            String details = "TEST VIOLATION (simulated via /hg test)";
+            Violation violation = ViolationManager.get().flag(data, checkName, check.getType().getDisplayName(), vlAmount, details);
+
+            if (violation != null) {
+                sendSuccess(ctx, String.format("Simulated %s violation with VL %.1f", checkName, vlAmount));
+                sendInfo(ctx, String.format("Total VL for %s: %.1f", checkName, data.getVL(checkName)));
+            } else {
+                sendError(ctx, "Failed to simulate violation (player may be exempt)");
+            }
+
             return CompletableFuture.completedFuture(null);
         }
     }

@@ -1,6 +1,5 @@
 package dev.hypersystems.hyperguard.check.movement;
 
-import com.hypixel.hytale.protocol.MovementStates;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import dev.hypersystems.hyperguard.player.HGPlayerData;
 import dev.hypersystems.hyperguard.player.PositionHistory;
@@ -35,71 +34,47 @@ public final class NoFallCheck extends MovementCheck {
             return;
         }
 
-        // Get movement data from ECS
-        MovementData movementData = getMovementData(player);
-        if (movementData == null) {
-            return;
-        }
-
-        MovementStates states = movementData.getStates();
-
         // Check for movement exemptions
-        if (hasMovementExemption(playerData, states)) {
+        if (hasMovementExemption(playerData)) {
             resetFallTracking(playerData);
             return;
         }
 
         // Flying - exempt (no fall damage in flight mode)
-        if (states.flying) {
+        if (playerData.isFlying()) {
             resetFallTracking(playerData);
             return;
         }
 
-        // Gliding - modified (reduced fall damage)
-        if (states.gliding) {
+        // Gliding - exempt
+        if (playerData.isGliding()) {
             resetFallTracking(playerData);
             return;
         }
 
-        // Swimming/InFluid - exempt (water negates fall damage)
-        if (states.inFluid || states.swimming) {
+        // Swimming - exempt (water negates fall damage)
+        if (playerData.isSwimming()) {
             resetFallTracking(playerData);
             return;
         }
 
-        // Climbing - exempt (ladder/vine negates fall damage)
-        if (states.climbing) {
+        // Climbing - exempt
+        if (playerData.isClimbing()) {
             resetFallTracking(playerData);
             return;
         }
 
-        // Rolling - exempt (roll negates fall damage in some games)
-        if (states.rolling) {
-            resetFallTracking(playerData);
+        // Get position samples
+        PositionHistory.PositionSample[] samples = getPositionSamples(playerData);
+        if (samples == null) {
             return;
         }
 
-        // Mounting - exempt (mount handles fall damage)
-        if (states.mounting) {
-            resetFallTracking(playerData);
-            return;
-        }
-
-        // Get position history
-        PositionHistory history = playerData.getPositionHistory();
-        if (history.size() < 2) {
-            return;
-        }
-
-        PositionHistory.PositionSample current = history.getLatest();
-        PositionHistory.PositionSample previous = history.getPrevious();
-
-        if (current == null || previous == null) {
-            return;
-        }
+        PositionHistory.PositionSample current = samples[0];
+        PositionHistory.PositionSample previous = samples[1];
 
         boolean wasOnGround = playerData.getCustomInt(WAS_ON_GROUND_KEY) == 1;
-        boolean isOnGround = states.onGround;
+        boolean isOnGround = current.onGround();
 
         double currentY = current.y();
         double previousY = previous.y();
@@ -107,76 +82,68 @@ public final class NoFallCheck extends MovementCheck {
 
         // Track fall
         if (!isOnGround && yDelta < 0) {
-            // Falling - accumulate distance
             double fallDistance = playerData.getCustomDouble(FALL_DISTANCE_KEY);
             fallDistance += Math.abs(yDelta);
             playerData.setCustomDouble(FALL_DISTANCE_KEY, fallDistance);
 
-            // Track start Y if just started falling
             if (wasOnGround) {
                 playerData.setCustomDouble(FALL_START_Y_KEY, previousY);
             }
 
-            // Track max fall velocity
             double maxYVel = playerData.getCustomDouble(MAX_Y_VEL_KEY);
             double currentFallSpeed = Math.abs(yDelta);
             if (currentFallSpeed > maxYVel) {
                 playerData.setCustomDouble(MAX_Y_VEL_KEY, currentFallSpeed);
             }
+
+            sendDebug(player, playerData, "falling: dist=%.2f yVel=%.3f", fallDistance, currentFallSpeed);
         }
 
-        // Check for landing (transition from air to ground)
+        // Check for landing
         if (!wasOnGround && isOnGround) {
-            checkLanding(playerData, states);
+            checkLanding(player, playerData);
         }
 
-        // Update ground state for next tick
+        // Update ground state
         playerData.setCustomInt(WAS_ON_GROUND_KEY, isOnGround ? 1 : 0);
     }
 
-    /**
-     * Checks if fall damage should have been received on landing.
-     */
-    private void checkLanding(@NotNull HGPlayerData playerData, @NotNull MovementStates states) {
+    private void checkLanding(@NotNull PlayerRef player, @NotNull HGPlayerData playerData) {
         double fallDistance = playerData.getCustomDouble(FALL_DISTANCE_KEY);
         double maxYVel = playerData.getCustomDouble(MAX_Y_VEL_KEY);
-        double startY = playerData.getCustomDouble(FALL_START_Y_KEY);
 
         // Reset tracking after checking
         resetFallTracking(playerData);
 
-        // Check if fall was significant enough to expect damage
+        // Check if fall was significant
         if (fallDistance < MovementConstants.NOFALL_MIN_DISTANCE) {
+            sendDebug(player, playerData, "landed: dist=%.2f (below threshold)", fallDistance);
             return;
         }
 
         if (maxYVel < MovementConstants.NOFALL_DAMAGE_VELOCITY) {
+            sendDebug(player, playerData, "landed: vel=%.3f (below damage threshold)", maxYVel);
             return;
         }
 
-        // Calculate expected damage based on fall velocity
-        // Formula: damage = (0.58 * (maxYVel - 0.5))^2 + 10%
+        // Calculate expected damage
         double baseDamage = Math.pow(0.58 * (maxYVel - 0.5), 2);
-        double expectedDamage = baseDamage * 1.1; // +10% margin
+        double expectedDamage = baseDamage * 1.1;
 
-        // Only flag if damage was expected and wasn't received recently
         if (expectedDamage > 0.5) {
             long ticksSinceDamage = playerData.getTicksSinceDamage();
-
-            // Allow some ticks for damage to register
             double tolerance = getTolerance();
             int damageWindowTicks = (int) (5 + (5 * tolerance));
 
+            sendDebug(player, playerData, "landed: dist=%.2f vel=%.3f dmgExpected=%.2f lastDmg=%d ticks",
+                fallDistance, maxYVel, expectedDamage, ticksSinceDamage);
+
             if (ticksSinceDamage > damageWindowTicks) {
-                // No damage received when it should have been
                 double vlAmount = Math.min(fallDistance * 0.5, 10.0);
 
                 String details = String.format(
                     "fallDist=%.2f maxVel=%.3f expectedDmg=%.2f lastDmg=%d ticks ago",
-                    fallDistance,
-                    maxYVel,
-                    expectedDamage,
-                    ticksSinceDamage
+                    fallDistance, maxYVel, expectedDamage, ticksSinceDamage
                 );
 
                 flag(playerData, vlAmount, details);
@@ -184,9 +151,6 @@ public final class NoFallCheck extends MovementCheck {
         }
     }
 
-    /**
-     * Resets all fall tracking data.
-     */
     private void resetFallTracking(@NotNull HGPlayerData playerData) {
         playerData.resetCustomDouble(FALL_DISTANCE_KEY);
         playerData.resetCustomDouble(MAX_Y_VEL_KEY);
