@@ -1,6 +1,10 @@
 package dev.hypersystems.hyperguard.check;
 
 import com.hypixel.hytale.server.core.universe.PlayerRef;
+import dev.hypersystems.hyperguard.check.movement.FlyCheck;
+import dev.hypersystems.hyperguard.check.movement.NoFallCheck;
+import dev.hypersystems.hyperguard.check.movement.PhaseCheck;
+import dev.hypersystems.hyperguard.check.movement.SpeedCheck;
 import dev.hypersystems.hyperguard.player.HGPlayerData;
 import dev.hypersystems.hyperguard.util.Logger;
 import org.jetbrains.annotations.NotNull;
@@ -217,8 +221,12 @@ public final class CheckManager {
      * Called during plugin initialization.
      */
     public void registerDefaultChecks() {
-        // Phase 1 only sets up the framework
-        // Actual check implementations will be added in Phase 2+
+        // Movement checks (Phase 2)
+        registerCheck(new SpeedCheck());
+        registerCheck(new FlyCheck());
+        registerCheck(new NoFallCheck());
+        registerCheck(new PhaseCheck());
+
         Logger.info("Check framework ready - %d checks registered", checks.size());
     }
 }

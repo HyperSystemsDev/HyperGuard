@@ -1,5 +1,6 @@
 package dev.hypersystems.hyperguard.player;
 
+import com.hypixel.hytale.server.core.universe.PlayerRef;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -14,6 +15,9 @@ public final class HGPlayerData {
     private final UUID uuid;
     private final String username;
     private final long joinTime;
+
+    // PlayerRef for ECS component access
+    private PlayerRef playerRef;
 
     // Position tracking
     private final PositionHistory positionHistory;
@@ -46,6 +50,10 @@ public final class HGPlayerData {
 
     // Alert toggle for staff
     private boolean alertsEnabled;
+
+    // Custom data storage for checks
+    private final Map<String, Integer> customInts = new HashMap<>();
+    private final Map<String, Double> customDoubles = new HashMap<>();
 
     /**
      * Creates new player data.
@@ -449,5 +457,119 @@ public final class HGPlayerData {
      */
     public void setAlertsEnabled(boolean alertsEnabled) {
         this.alertsEnabled = alertsEnabled;
+    }
+
+    // ==================== PlayerRef Access ====================
+
+    /**
+     * Gets the PlayerRef for ECS component access.
+     *
+     * @return the PlayerRef, or null if not set
+     */
+    @Nullable
+    public PlayerRef getPlayerRef() {
+        return playerRef;
+    }
+
+    /**
+     * Sets the PlayerRef for ECS component access.
+     *
+     * @param playerRef the PlayerRef
+     */
+    public void setPlayerRef(@Nullable PlayerRef playerRef) {
+        this.playerRef = playerRef;
+    }
+
+    // ==================== Custom Data Storage ====================
+
+    /**
+     * Gets a custom integer value.
+     *
+     * @param key the key
+     * @return the value, or 0 if not set
+     */
+    public int getCustomInt(@NotNull String key) {
+        return customInts.getOrDefault(key, 0);
+    }
+
+    /**
+     * Sets a custom integer value.
+     *
+     * @param key the key
+     * @param value the value
+     */
+    public void setCustomInt(@NotNull String key, int value) {
+        customInts.put(key, value);
+    }
+
+    /**
+     * Increments a custom integer value.
+     *
+     * @param key the key
+     * @return the new value
+     */
+    public int incrementCustomInt(@NotNull String key) {
+        int newValue = customInts.getOrDefault(key, 0) + 1;
+        customInts.put(key, newValue);
+        return newValue;
+    }
+
+    /**
+     * Resets a custom integer value to 0.
+     *
+     * @param key the key
+     */
+    public void resetCustomInt(@NotNull String key) {
+        customInts.remove(key);
+    }
+
+    /**
+     * Gets a custom double value.
+     *
+     * @param key the key
+     * @return the value, or 0.0 if not set
+     */
+    public double getCustomDouble(@NotNull String key) {
+        return customDoubles.getOrDefault(key, 0.0);
+    }
+
+    /**
+     * Sets a custom double value.
+     *
+     * @param key the key
+     * @param value the value
+     */
+    public void setCustomDouble(@NotNull String key, double value) {
+        customDoubles.put(key, value);
+    }
+
+    /**
+     * Adds to a custom double value.
+     *
+     * @param key the key
+     * @param amount the amount to add
+     * @return the new value
+     */
+    public double addCustomDouble(@NotNull String key, double amount) {
+        double newValue = customDoubles.getOrDefault(key, 0.0) + amount;
+        customDoubles.put(key, newValue);
+        return newValue;
+    }
+
+    /**
+     * Resets a custom double value to 0.0.
+     *
+     * @param key the key
+     */
+    public void resetCustomDouble(@NotNull String key) {
+        customDoubles.remove(key);
+    }
+
+    /**
+     * Clears all custom data.
+     */
+    public void clearCustomData() {
+        customInts.clear();
+        customDoubles.clear();
     }
 }

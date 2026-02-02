@@ -80,6 +80,9 @@ public final class PlayerConnectionListener {
             // Create player data
             HGPlayerData data = HGPlayerManager.get().createPlayerData(uuid, username);
 
+            // Set PlayerRef for ECS component access
+            data.setPlayerRef(playerRef);
+
             // Track player in ActionExecutor for message sending
             ActionExecutor.get().trackPlayer(uuid, playerRef);
 

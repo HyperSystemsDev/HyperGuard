@@ -3,12 +3,15 @@ package dev.hypersystems.hyperguard;
 import com.hypixel.hytale.event.EventRegistry;
 import com.hypixel.hytale.server.core.plugin.JavaPlugin;
 import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
+import com.hypixel.hytale.server.core.universe.PlayerRef;
 import dev.hypersystems.hyperguard.action.ActionExecutor;
 import dev.hypersystems.hyperguard.alert.AlertManager;
 import dev.hypersystems.hyperguard.check.CheckManager;
+import dev.hypersystems.hyperguard.check.CheckType;
 import dev.hypersystems.hyperguard.command.HyperGuardCommand;
 import dev.hypersystems.hyperguard.config.HyperGuardConfig;
 import dev.hypersystems.hyperguard.listener.PlayerConnectionListener;
+import dev.hypersystems.hyperguard.player.HGPlayerData;
 import dev.hypersystems.hyperguard.player.HGPlayerManager;
 import dev.hypersystems.hyperguard.util.Logger;
 import dev.hypersystems.hyperguard.violation.ViolationManager;
@@ -32,6 +35,7 @@ public class HyperGuard extends JavaPlugin {
     private PlayerConnectionListener connectionListener;
     private ScheduledExecutorService scheduler;
     private ScheduledFuture<?> vlDecayTask;
+    private ScheduledFuture<?> movementCheckTask;
 
     /**
      * Creates a new HyperGuard instance.
@@ -123,6 +127,10 @@ public class HyperGuard extends JavaPlugin {
             // Cancel scheduled tasks
             if (vlDecayTask != null) {
                 vlDecayTask.cancel(false);
+            }
+
+            if (movementCheckTask != null) {
+                movementCheckTask.cancel(false);
             }
 
             // Shutdown scheduler
@@ -226,6 +234,16 @@ public class HyperGuard extends JavaPlugin {
         );
 
         Logger.debug("Scheduled VL decay task (every %d ticks / %dms)", decayIntervalTicks, decayIntervalMs);
+
+        // Movement check task - runs every tick (50ms)
+        movementCheckTask = scheduler.scheduleAtFixedRate(
+            this::runMovementChecks,
+            50,
+            50,
+            TimeUnit.MILLISECONDS
+        );
+
+        Logger.debug("Scheduled movement check task (every tick / 50ms)");
     }
 
     /**
@@ -236,6 +254,22 @@ public class HyperGuard extends JavaPlugin {
             ViolationManager.get().decayAllPlayers();
         } catch (Exception e) {
             Logger.debug("VL decay task error: %s", e.getMessage());
+        }
+    }
+
+    /**
+     * Movement check task - runs movement checks for all online players.
+     */
+    private void runMovementChecks() {
+        try {
+            for (HGPlayerData playerData : HGPlayerManager.get().getAllPlayerData()) {
+                PlayerRef playerRef = playerData.getPlayerRef();
+                if (playerRef != null && playerRef.isValid()) {
+                    CheckManager.get().processChecksByType(CheckType.MOVEMENT, playerRef, playerData);
+                }
+            }
+        } catch (Exception e) {
+            Logger.debug("Movement check task error: %s", e.getMessage());
         }
     }
 
