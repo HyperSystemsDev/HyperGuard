@@ -1,0 +1,30 @@
+# IDE
+.idea/
+*.iml
+.vscode/
+*.code-workspace
+
+# Build
+build/
+out/
+target/
+*.jar
+*.class
+
+# Gradle
+.gradle/
+gradle/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Local config
+local.properties
+
+# AI Assistant Instructions
+CLAUDE.md
