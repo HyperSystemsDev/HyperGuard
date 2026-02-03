@@ -1,9 +1,13 @@
 # HyperGuard
 
-**Comprehensive Server-Side Anti-Cheat for Hytale**
+[![Discord](https://img.shields.io/badge/Discord-Join%20Us-7289DA?logo=discord&logoColor=white)](https://discord.gg/SNPjyfkYPc)
+[![GitHub](https://img.shields.io/github/stars/HyperSystemsDev/HyperGuard?style=social)](https://github.com/HyperSystemsDev/HyperGuard)
 
-[![Discord](https://img.shields.io/badge/Discord-Join%20Us-7289DA)](https://discord.gg/SNPjyfkYPc)
-[![GitHub](https://img.shields.io/badge/GitHub-HyperSystemsDev-181717)](https://github.com/HyperSystemsDev)
+Comprehensive server-side anti-cheat for Hytale. Part of the **HyperSystems** plugin suite.
+
+**Version:** 0.1.0 (Development)
+**Game:** Hytale Early Access
+**License:** GPLv3
 
 ---
 
@@ -11,7 +15,9 @@
 
 HyperGuard is a high-accuracy, low false-positive anti-cheat plugin designed specifically for Hytale servers. It provides comprehensive cheat detection while maintaining excellent performance for high-player-count servers.
 
-### Key Features
+---
+
+## Key Features
 
 - **Movement Detection** - Speed, fly, phase, no-fall, velocity manipulation
 - **Combat Detection** - Reach, killaura, auto-clicker, aim assist, criticals
@@ -23,135 +29,73 @@ HyperGuard is a high-accuracy, low false-positive anti-cheat plugin designed spe
 
 ---
 
-## Documentation
-
-| Document | Description |
-|----------|-------------|
-| [ANTICHEAT_FEASIBILITY.md](ANTICHEAT_FEASIBILITY.md) | Complete server analysis and feasibility study |
-| [PLUGIN_API.md](PLUGIN_API.md) | Hytale plugin development API reference |
-| [EVENTS.md](EVENTS.md) | Available events and hook points |
-| [PERMISSIONS.md](PERMISSIONS.md) | Permission system documentation |
-| [CLAUDE.md](CLAUDE.md) | AI-assisted development instructions |
-
----
-
-## Reference Files
-
-The `HyperGuard-reference/` directory contains decompiled server code for understanding the underlying systems:
-
-```
-HyperGuard-reference/
-├── movement/        # Movement validation (PlayerProcessMovementSystem, Velocity, etc.)
-├── combat/          # Hit detection (HitDetectionExecutor)
-├── damage/          # Damage pipeline (DamageSystems, Damage, DamageCause)
-├── entity/          # Player/entity components (Player, TransformComponent)
-├── collision/       # Collision detection (CollisionModule, CollisionResult)
-├── protocol/        # Network packets (MouseInteraction, ChangeVelocity)
-├── events/          # Event classes (BreakBlockEvent, PlaceBlockEvent)
-└── plugin/          # Permission system (PermissionsModule)
-```
-
----
-
 ## Development Status
 
 **Current Phase:** Phase 2 - Movement Check Calibration
 
-HyperGuard is actively being developed and calibrated for Hytale's unique movement physics. Movement checks have been implemented and are being fine-tuned to minimize false positives while maintaining detection accuracy.
+HyperGuard is actively being developed and calibrated for Hytale's unique movement physics.
 
-### Recent Updates (Phase 2)
+### Detection Status
 
-- **Speed Check**: Calibrated with empirical Hytale movement values
-  - Walking: ~0.28-0.37 blocks/tick
-  - Sprinting: ~0.56-0.60 blocks/tick
-  - Sprint-jumping: ~0.75-0.91 blocks/tick
-  - Speed-based state inference (walking/sprinting/sprint-jumping)
-
-- **Fly Check**: Improved jump detection
-  - Dual detection: ground-based and velocity-change based
-  - 15-tick grace period for jump ascent
-  - Bunny hop / consecutive jump support
-  - Gravity and hovering detection
-
-- **Thread-Safe Architecture**: All checks run on background scheduler
-  - Position history tracking via `PositionHistory` ring buffer
-  - Movement state inference from speed (ECS components unavailable async)
-
----
-
-## Detection Capabilities
-
-### Movement Checks
-| Check | Description | Status |
-|-------|-------------|--------|
-| Speed | Detects movement speed exceeding allowed limits | ✅ Implemented |
-| Fly | Detects unauthorized flight and gravity bypass | ✅ Implemented |
-| Phase | Detects clipping through blocks | ✅ Implemented (needs testing) |
-| NoFall | Detects fall damage bypass | ✅ Implemented (needs testing) |
-| Step | Detects instant step up | ✅ Implemented (needs testing) |
-| Jesus | Detects walking on water | 🔜 Planned |
-| Velocity | Detects velocity manipulation | 🔜 Planned |
-
-### Combat Checks
-| Check | Description | Status |
-|-------|-------------|--------|
-| Reach | Detects hitting from excessive distance | 🔜 Planned |
-| HitRate | Detects impossible click rates | 🔜 Planned |
-| Killaura | Detects automated combat | 🔜 Planned |
-| AutoClicker | Detects click pattern consistency | 🔜 Planned |
-| AimAssist | Detects unnatural aim smoothing | 🔜 Planned |
-| Criticals | Detects invalid critical hits | 🔜 Planned |
-
-### World Checks
-| Check | Description | Status |
-|-------|-------------|--------|
-| FastBreak | Detects breaking blocks too quickly | 🔜 Planned |
-| Scaffold | Detects automated bridging | 🔜 Planned |
-| Xray | Detects suspicious ore discovery patterns | 🔜 Planned |
-| Nuker | Detects mass block destruction | 🔜 Planned |
+| Category | Check | Status |
+|----------|-------|--------|
+| Movement | Speed | Implemented |
+| Movement | Fly | Implemented |
+| Movement | Phase | Implemented (testing) |
+| Movement | NoFall | Implemented (testing) |
+| Movement | Step | Implemented (testing) |
+| Movement | Jesus | Planned |
+| Movement | Velocity | Planned |
+| Combat | Reach | Planned |
+| Combat | HitRate | Planned |
+| Combat | Killaura | Planned |
+| Combat | AutoClicker | Planned |
+| World | FastBreak | Planned |
+| World | Scaffold | Planned |
+| World | Xray | Planned |
 
 ---
 
-## Testing Status
+## Installation
 
-### Needs Further Testing
-- **Phase Check**: Vertical phase detection may trigger on stairs/slopes
-- **NoFall Check**: Fall damage threshold calibration needed
-- **Step Check**: Step height validation needs testing
-- **Speed Check**: Edge cases with doors/interactions may need exemptions
+1. Build the plugin or download from releases
+2. Place `HyperGuard-<version>.jar` in your server's `mods` directory
+3. Start the server to generate default configuration
+4. Customize `mods/com.hyperguard_HyperGuard/config.json`
+5. Use `/hg reload` to apply changes
 
 ---
 
 ## Commands
 
-```
-/hg alerts [on|off]         - Toggle staff alerts
-/hg check <player>          - View player's violation levels
-/hg violations [player]     - View recent violations
-/hg toggle <check>          - Enable/disable a check
-/hg reload                  - Reload configuration
-/hg exempt <player> [check] - Temporarily exempt a player
-/hg debug <player>          - Enable debug mode for a player
-/hg info                    - Show plugin info and status
-```
+| Command | Description | Permission |
+|---------|-------------|------------|
+| `/hg alerts [on\|off]` | Toggle staff alerts | `hyperguard.alerts` |
+| `/hg check <player>` | View player's violation levels | `hyperguard.command` |
+| `/hg violations [player]` | View recent violations | `hyperguard.command` |
+| `/hg toggle <check>` | Enable/disable a check | `hyperguard.admin` |
+| `/hg reload` | Reload configuration | `hyperguard.admin` |
+| `/hg exempt <player> [check]` | Temporarily exempt a player | `hyperguard.admin` |
+| `/hg debug <player>` | Enable debug mode for a player | `hyperguard.admin` |
+| `/hg info` | Show plugin info and status | `hyperguard.command` |
 
 ---
 
 ## Permissions
 
-```
-hyperguard.command              - Base command access
-hyperguard.alerts               - Receive violation alerts
-hyperguard.admin                - Full admin access
-hyperguard.bypass               - Bypass all checks
-hyperguard.bypass.<check>       - Bypass specific check
-```
+| Permission | Description | Default |
+|------------|-------------|---------|
+| `hyperguard.command` | Base command access | op |
+| `hyperguard.alerts` | Receive violation alerts | op |
+| `hyperguard.admin` | Full admin access | op |
+| `hyperguard.bypass` | Bypass all checks | op |
+| `hyperguard.bypass.<check>` | Bypass specific check | op |
 
 ---
 
 ## Configuration
 
-Configuration is JSON-based and supports per-check customization:
+Configuration file: `mods/com.hyperguard_HyperGuard/config.json`
 
 ```json
 {
@@ -193,43 +137,51 @@ Configuration is JSON-based and supports per-check customization:
 
 ---
 
-## Building
+## Documentation
 
-```bash
-# Build the plugin
-./gradlew shadowJar
+| Document | Description |
+|----------|-------------|
+| [ANTICHEAT_FEASIBILITY.md](ANTICHEAT_FEASIBILITY.md) | Server analysis and feasibility study |
+| [PLUGIN_API.md](PLUGIN_API.md) | Hytale plugin development API reference |
+| [EVENTS.md](EVENTS.md) | Available events and hook points |
+| [PERMISSIONS.md](PERMISSIONS.md) | Permission system documentation |
 
-# Output: build/libs/HyperGuard-<version>.jar
-```
+---
+
+## Building from Source
 
 ### Requirements
-- Java 25 (Temurin recommended)
-- Gradle 9.3+
+
+- Java 21+ (for building)
+- Java 25 (for running on Hytale server)
+- Gradle 8.12+
+- Hytale Server (Early Access)
+
+```bash
+./gradlew shadowJar
+```
+
+The output JAR will be in `build/libs/`.
 
 ---
 
-## Installation
+## Support
 
-1. Build the plugin or download from releases
-2. Place `HyperGuard-<version>.jar` in your server's `mods/` directory
-3. Start the server to generate default configuration
-4. Customize `plugins/HyperGuard/config.json`
-5. Use `/hg reload` to apply changes
+- **Discord:** https://discord.gg/SNPjyfkYPc
+- **GitHub Issues:** https://github.com/HyperSystemsDev/HyperGuard/issues
 
 ---
 
-## Contributing
+## Credits
 
-This project is developed by [HyperSystemsDev](https://github.com/HyperSystemsDev).
+Developed by **HyperSystemsDev**
 
-Join our [Discord](https://discord.gg/SNPjyfkYPc) for support and discussion.
-
----
-
-## License
-
-All rights reserved. This is proprietary software.
+Part of the **HyperSystems** plugin suite:
+- [HyperPerms](https://github.com/HyperSystemsDev/HyperPerms) - Advanced permissions
+- [HyperHomes](https://github.com/HyperSystemsDev/HyperHomes) - Home teleportation
+- [HyperFactions](https://github.com/HyperSystemsDev/HyperFactions) - Faction management
+- [HyperWarp](https://github.com/HyperSystemsDev/HyperWarp) - Warps, spawns, TPA
 
 ---
 
-*Built with care for the Hytale community.*
+*HyperGuard - Fair Play, Always*
